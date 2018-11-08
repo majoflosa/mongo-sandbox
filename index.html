@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="X-UA-Compatible" content="ie=edge">
+    <title>Mongo Sandbox</title>
+    <style>
+        body {font-family: sans-serif}
+        .product {display: inline-block; padding: 15px; background: #f0f0f0; margin: 10px;}
+        .product ul {margin: 0; padding: 0;}
+        .product li {list-style-type: none}
+    </style>
+</head>
+<body>
+    <div class="form">
+        Item: <input type="text" id="data-input">
+        Qty: <input type="number" id="qty-input">
+        Status: <input type="text" id="status-input">
+        Tags: <input type="text" id="tags-input">
+        <button id="test">New Product</button>
+    </div>
+
+    <section id="inventory"></section>
+
+    <script type="text/template" id="product-template">
+        <article class="product" id="<%= id %>">
+            <ul>
+                <li><b>Item:</b> <%= item %></li>
+                <li><b>Qty:</b> <%= qty %></li>
+                <li><b>Status:</b> <%= status %></li>
+                <li><b>Tags:</b> <%= tags.join(", ") %></li>
+                <hr>
+                <button class="delete-product">Delete</button>
+                <button class="add-ten">Add 10 to stock</button>
+            </ul>
+        </article>
+    </script>
+
+    <script
+    src="https://code.jquery.com/jquery-3.3.1.min.js"
+    integrity="sha256-FgpCb/KJQlLNfOu91ta32o/NMZxltwRo8QtmkMRdAu8="
+    crossorigin="anonymous"></script>
+    <script src="underscore.js"></script>
+    <script>
+        $(document).ready(function() {
+            // READ products
+            $.ajax({
+                method: 'get',
+                url: '/test',
+                success: function( response ) { 
+                    var productTemplate = _.template( $('#product-template').html() );
+                    _.each( response.products, function( product ) {
+                        $('#inventory').append( productTemplate({
+                            id: product._id,
+                            item: product.item,
+                            qty: product.qty,
+                            status: product.status,
+                            tags: product.tags
+                        }) );
+                    });
+                },
+                error: function( response ) { console.log('error: ', response ) }
+            });
+            
+            // CREATE products
+            $('#test').click(function() {
+                let data = {
+                    item: $('#data-input').val(),
+                    qty: $('#qty-input').val(),
+                    status: $('#status-input').val(),
+                    tags: $('#tags-input').val()
+                };
+                $.ajax({
+                    url: '/test',
+                    method: 'post',
+                    data: JSON.stringify( data ),
+                    dataType: 'json',
+                    contentType: 'application/json',
+                    processData: false,
+                    success: function( response ) { 
+                        console.log('Product saved');
+                        $('#inventory').html('');
+                        var productTemplate = _.template( $('#product-template').html() );
+                        _.each( response.products, function( product ) {
+                            $('#inventory').append( productTemplate({
+                                id: product._id,
+                                item: product.item,
+                                qty: product.qty,
+                                status: product.status,
+                                tags: product.tags
+                            }) );
+                        });
+                        $('.form').find('input').val('');
+                    },
+                    error: function( err ) { console.log('Save failed: ', err) }
+                });
+            });
+
+            // UPDATE product
+            $('#inventory').delegate('.add-ten', 'click', function() {
+                var $thisProduct = $(this).closest('.product');
+                var thisId = $thisProduct.attr('id');
+
+                var data = { qty: 10 };
+                
+                $.ajax({
+                    method: 'put',
+                    url: '/test/' + thisId,
+                    data: JSON.stringify( data ),
+                    dataType: 'json',
+                    contentType: 'application/json',
+                    processData: false,
+                    success: function(response) {
+                        var thisQty = $thisProduct.find('li:nth-child(2)');
+                        thisQty.html('<b>Qty:</b> ' + response.qty );
+                    },
+                    error: function( err ) { console.log( 'update failed: ', err ); }
+                });
+            });
+            
+            // DELETE products
+            $('#inventory').delegate('.delete-product', 'click', function() {
+                var $thisProduct = $(this).closest('.product');
+                var thisId = $thisProduct.attr('id');
+
+                $.ajax({
+                    method: 'delete',
+                    url: '/test/' + thisId,
+                    success: function(response) {
+                        console.log('Product deleted: ', response);
+                        $thisProduct.remove();
+                    },
+                    error: function() { console.log('Delete failed'); }
+                });
+            });
+        });
+    </script>
+</body>
+</html>
